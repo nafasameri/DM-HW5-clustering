@@ -1,148 +1,120 @@
+import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.datasets import load_iris
 from sklearn.cluster import DBSCAN
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances, silhouette_score
 from sklearn.preprocessing import MinMaxScaler
+import seaborn as sns
 
 
 def read_data():
     iris = load_iris()
+    # print(iris)
     X = iris.data
     return X
 
 
 def normalize(X):
-    # نرمال‌سازی داده‌ها با استفاده از روش Min-Max
     scaler = MinMaxScaler()
     X_normalized = scaler.fit_transform(X)
 
-    # ساخت ماتریس شباهت با استفاده از فاصله اقلیدسی
     similarity_matrix = pairwise_distances(X_normalized, metric='euclidean')
-
-    # نمایش ماتریس شباهت
+    print('===================== similarity matrix =====================')
     print(similarity_matrix)
+
+    plt.figure()
+    sns.heatmap(similarity_matrix, cmap=sns.cubehelix_palette(as_cmap=True))
+    plt.title("Similarity Matrix")
+    plt.savefig('similarity_matrix.png')
+    return X_normalized
 
 
 def kmeans(X):
-    # ساخت مدل k-means با تعداد خوشه‌های مورد نظر (اینجا سه خوشه)
     kmeans = KMeans(n_clusters=3, random_state=42)
-
-    # آموزش مدل بر روی داده‌ها
     kmeans.fit(X)
 
-    # برچسب‌های خوشه‌ها برای نمونه‌ها
     labels = kmeans.labels_
-
-    # نمایش برچسب‌ها
     print(labels)
+
+    # مرکزهای خوشه‌ها
+    centers = kmeans.cluster_centers_
+
+    # نمایش خوشه‌بندی
+    plt.figure()
+    plt.scatter(X[:, 0], X[:, 1], c=labels, cmap='viridis')
+    plt.scatter(centers[:, 0], centers[:, 1], marker='x', c='red', s=200)
+    plt.xlabel('Sepal Length')
+    plt.ylabel('Sepal Width')
+    plt.title('K-means Clustering on Iris Dataset')
+    plt.savefig('K-means.png')
+
+    score = silhouette_score(X, labels)
+    print('score:', score)
 
 
 def dbscan(X):
-    # اجرای الگوریتم DBSCAN با پارامترهای مناسب
-    dbscan = DBSCAN(eps=0.3, min_samples=5)
+    X = X[:, [0, 1]]  # استفاده از ویژگی‌های Sepal Length و Sepal Width
 
-    # خوشه‌بندی داده‌ها
-    dbscan.fit(X)
+    _dbscan = DBSCAN(eps=0.11, min_samples=2)
+    _dbscan.fit(X)
 
-    # برچسب‌های خوشه‌ها برای نمونه‌ها (-1 برای نمونه‌هایی که به هیچ خوشه‌ای تعلق نمی‌گیرند)
-    labels = dbscan.labels_
-
-    # نمایش برچسب‌ها
+    labels = _dbscan.labels_
     print(labels)
 
+    # تعداد خوشه‌ها (بدون در نظر گرفتن نمونه‌های پرت)
+    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
-def test_data(clf, X_Test, Y_Test, method):
-    y_pred = clf.predict(X_Test)
-    # print("prediction labels:", y_pred)
+    # نمایش خوشه‌بندی
+    plt.figure()
+    for i in range(n_clusters):
+        cluster_points = X[labels == i]
+        plt.scatter(cluster_points[:, 0], cluster_points[:, 1], label=f'Cluster {i + 1}')
 
-    from sklearn.metrics import roc_curve
-    fpr, tpr, thresholds = roc_curve(Y_Test, y_pred)
-    AUC_ROC = roc_auc_score(Y_Test, y_pred)
-    roc_curve = plt.figure()
-    plt.plot(fpr, tpr, '-', label='Area Under the Curve (AUC = %0.4f)' % AUC_ROC)
-    plt.title('ROC curve')
-    plt.xlabel("FPR (False Positive Rate)")
-    plt.ylabel("TPR (True Positive Rate)")
-    plt.legend(loc="lower right")
-    plt.savefig('results/' + method + "-ROC.png")
+    plt.xlabel('Sepal Length')
+    plt.ylabel('Sepal Width')
+    plt.title(f'DBSCAN Clustering on Iris Dataset (Number of Clusters: {n_clusters})')
+    plt.legend()
     # plt.show()
+    plt.savefig('DBSCAN.png')
 
-    precision, recall, thresholds = precision_recall_curve(Y_Test, y_pred)
-    precision = np.fliplr([precision])[0]  # so the array is increasing (you won't get negative AUC)
-    recall = np.fliplr([recall])[0]  # so the array is increasing (you won't get negative AUC)
-    AUC_prec_rec = np.trapz(precision, recall)
-    print("Area under Precision-Recall curve:", AUC_prec_rec)
-    prec_rec_curve = plt.figure()
-    plt.plot(recall, precision, '-', label='Area Under the Curve (AUC = %0.4f)' % AUC_prec_rec)
-    plt.title('Precision - Recall curve')
-    plt.xlabel("Recall")
-    plt.ylabel("Precision")
-    plt.legend(loc="lower right")
-    plt.savefig('results/' + method + "-Precision_recall.png")
-    # plt.show()
+    score = silhouette_score(X, labels)
+    print('score:', score)
 
-    confusion = confusion_matrix(Y_Test, y_pred)
-    print("confusion_matrix: ", confusion)
-    tn, fp, fn, tp = confusion.ravel()
 
-    accuracy = 0
-    if float(np.sum(confusion)) != 0:
-        accuracy = float(tp + tn) / float(np.sum(confusion))
-    print("Accuracy: " + str(accuracy))
+def setMinPtsEpsilonParameters(X):
+    # X = X[:, [0, 1]]  # استفاده از ویژگی‌های Sepal Length و Sepal Width
 
-    specificity = 0
-    if float(tn + fp) != 0:
-        specificity = float(tn) / float(tn + fp)
-    print("Specificity: " + str(specificity))
+    # تنظیم پارامترهای MinPts و epsilon
+    min_pts_values = range(2, 11)
+    epsilon_min = np.min(X)
+    epsilon_max = np.max(X)
+    epsilon_values = np.linspace(epsilon_min, epsilon_max, num=10)[1:]
 
-    sensitivity = 0
-    if float(tp + fn) != 0:
-        sensitivity = float(tp) / float(tp + fn)
-    print("Sensitivity: " + str(sensitivity))
+    best_score = -1
+    best_labels = None
+    best_min_pts = None
+    best_epsilon = None
 
-    precision = 0
-    if float(tp + fp) != 0:
-        precision = float(tp) / float(tp + fp)
-    print("Precision: " + str(precision))
+    # اجرای الگوریتم DBSCAN با پارامترهای مختلف و انتخاب بهترین پارامترها
+    for min_pts in min_pts_values:
+        for epsilon in epsilon_values:
+            dbscan = DBSCAN(eps=epsilon, min_samples=min_pts)
+            labels = dbscan.fit_predict(X)
 
-    NPV = 0
-    if float(tn + fn) != 0:
-        NPV = float(tn) / float(tn + fn)
-    print("NPV: " + str(NPV))
+            try:
+                # ارزیابی کیفیت خوشه‌بندی
+                score = silhouette_score(X, labels)
 
-    f1score = 0
-    if float(tp + fp + fn) != 0:
-        f1score = float((2. * tp)) / float((2. * tp) + fp + fn)
-    print("F1-Score: " + str(f1score))
+                if score > best_score:
+                    best_score = score
+                    best_labels = labels
+                    best_min_pts = min_pts
+                    best_epsilon = epsilon
+            except:
+                pass
 
-    error_rate = 0
-    if float(np.sum(confusion)) != 0:
-        error_rate = float(fp + fn) / float(np.sum(confusion))
-    print("Error Rate: " + str(error_rate))
-
-    jaccard_index = jaccard_score(Y_Test, y_pred, average='weighted')
-    print("Jaccard similarity score: " + str(jaccard_index))
-
-    corrcoef = matthews_corrcoef(Y_Test, y_pred)
-    print("The Matthews correlation coefficient: " + str(corrcoef))
-
-    file_perf = open('results/' + method + '-performances.txt', 'w')
-    file_perf.write("Jaccard similarity score: " + str(jaccard_index)
-                    + "\nConfusion matrix: " + str({"Real Pos": {"tp": tp, "fn": fn}, "Real Neg": {"fp": fp, "tn": tn}})
-                    + "\nACCURACY: " + str(accuracy)
-                    + "\nSENSITIVITY: " + str(sensitivity)
-                    + "\nSPECIFICITY: " + str(specificity)
-                    + "\nPRECISION: " + str(precision)
-                    + "\nNPV: " + str(NPV)
-                    + "\nError Rate: " + str(error_rate)
-                    + "\nThe Matthews correlation coefficient: " + str(corrcoef)
-                    + "\nF1 score: " + str(f1score))
-    file_perf.close()
-
-    rep = classification_report(Y_Test, y_pred)
-    print(rep)
-    file_perf = open('results/' + method + '-classification_report.txt', 'w')
-    file_perf.write(rep)
-    file_perf.close()
-
-    return precision
+    # چاپ بهترین پارامترها و برچسب‌های خوشه‌بندی متناظر
+    print("Best MinPts:", best_min_pts)
+    print("Best Epsilon:", best_epsilon)
+    print("Best Clustering Labels:", best_labels)

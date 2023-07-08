@@ -4,8 +4,11 @@ X = read_data()
 X = normalize(X)
 
 
-print('===================== decision tree =====================')
+print('===================== kmeans =====================')
 kmeans(X)
 
-print('===================== gaussian =====================')
+print('===================== dbscan =====================')
 dbscan(X)
+
+print('===================== Setting MinPts and epsilon parameters =====================')
+setMinPtsEpsilonParameters(X)
